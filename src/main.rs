@@ -4,16 +4,27 @@ use std::sync::Arc;
 use std::usize;
 use tokio::sync::Mutex;
 
+#[derive()]
+enum HealthStatus {
+    Healthy,
+    Unhealthy(u32),
+}
+
 struct LoadBalancer {
     backends: Vec<String>,
     current_idx: usize,
+    health_status: Vec<HealthStatus>,
+    max_failures: u32,
 }
 
 impl LoadBalancer {
-    fn new(backends: Vec<String>) -> Self {
+    fn new(backends: Vec<String>, max_failures: u32) -> Self {
+        let health_status = vec![HealthStatus::Healthy; backends.len()];
         LoadBalancer {
             backends,
             current_idx: 0,
+            health_status,
+            max_failures,
         }
     }
 
