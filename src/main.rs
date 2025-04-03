@@ -82,6 +82,10 @@ impl LoadBalancer {
             }
         }
     }
+
+    fn all_backends(&self) -> Vec<String> {
+        self.backends.clone()
+    }
 }
 
 #[tokio::main]
