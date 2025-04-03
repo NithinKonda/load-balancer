@@ -40,4 +40,10 @@ async fn main() {
     ];
 
     let load_balancer = Arc::new(Mutex::new(LoadBalancer::new(backends)));
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+
+    info!("Starting load balancer on {}", addr);
+
+    info!("Load Balancer Stopped");
 }
