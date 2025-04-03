@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::usize;
 use tokio::sync::Mutex;
 
-#[derive()]
+#[derive(Debug, Clone, PartialEq)]
 enum HealthStatus {
     Healthy,
     Unhealthy(u32),
@@ -33,10 +33,21 @@ impl LoadBalancer {
             return None;
         }
 
-        let backend = self.backends[self.current_idx].clone();
-        self.current_idx = (self.current_idx + 1) % self.backends.len();
+        let start_idx = self.current_idx;
+        loop {
+            if let HealthStatus::Healthy = self.health_status[self.current_idx] {
+                let backend = self.backends[self.current_idx].clone();
+                self.current_idx = (self.current_idx + 1) % self.backends.len();
 
-        Some(backend)
+                return Some(backend);
+            }
+
+            self.current_idx = (self.current_idx + 1) % self.backends.len();
+
+            if self.current_idx == start_idx {
+                return None;
+            }
+        }
     }
 }
 
