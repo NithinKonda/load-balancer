@@ -28,6 +28,16 @@ impl LoadBalancer {
         Some(backend)
     }
 }
-fn main() {
-    println!("Hello, world!");
+
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+
+    let backends = vec![
+        "http://localhost:9001".to_string(),
+        "http://localhost:9002".to_string(),
+        "http://localhost:9003".to_string(),
+    ];
+
+    let load_balancer = Arc::new(Mutex::new(LoadBalancer::new(backends)));
 }
