@@ -69,6 +69,19 @@ impl LoadBalancer {
             }
         }
     }
+
+    fn mark_healthy(&mut self, backend_url: &str) {
+        if let Some(idx) = self.backends.iter().position(|url| url == backend_url) {
+            match &self.health_status[idx] {
+                HealthStatus::Healthy => {}
+
+                HealthStatus::Unhealthy(_) => {
+                    self.health_status[idx] = HealthStatus::Healthy;
+                    info!("Backend {} marked as healthy", backend_url);
+                }
+            }
+        }
+    }
 }
 
 #[tokio::main]
