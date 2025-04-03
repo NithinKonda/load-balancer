@@ -1,4 +1,7 @@
+use http::Request;
+use hyper::Body;
 use log::{error, info, warn};
+use reqwest::{Body, Request};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::usize;
@@ -85,6 +88,14 @@ impl LoadBalancer {
 
     fn all_backends(&self) -> Vec<String> {
         self.backends.clone()
+    }
+}
+
+fn clone_headers(src_req: &Request<Body>, dst_req: &mut Request<Body>) {
+    for (name, value) in src_req.headers() {
+        if name != hyper::header::HOST {
+            dst_req.headers_mut().insert(name.clone(), value.clone());
+        }
     }
 }
 
