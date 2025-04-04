@@ -5,16 +5,15 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use futures::StreamExt;
+use http::response;
 use hyper::body::{Body, HttpBody};
 use hyper::client::HttpConnector;
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::http::uri::Scheme;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Client, Method, Request, Response, Server, StatusCode, Uri};
-use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use log::{error, info, warn};
-use reqwest::{Body, Request, Response};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -138,6 +137,56 @@ async fn handle_request(
     lb: Arc<Mutex<LoadBalancer>>,
     client: Client<HttpConnector>,
 ) -> Result<Response<Body>, Infallible> {
+    info!("Received request: {} {}", req.method(), req.uri());
+
+    let backend = {
+        let mut lb = lb.lock().await;
+        lb.get_next_backend()
+    };
+
+    match backend {
+        Some(backend_url) => {
+            info!("Forwarding request to backend: {}", backend_url);
+
+            match forward_request(&client, &backend_url, req).await {
+                Ok(response) => {
+                    info!(
+                        "Received response from backend {} with status {}",
+                        backend_url,
+                        response.status()
+                    );
+
+                    let mut lb = lb.lock().await;
+                    lb.mark_healthy(&backend_url);
+
+                    Ok(response)
+                }
+                Err(e) => {
+                    error!("Error forwarding request to {}: {}", backend_url, e);
+
+                    let mut lb = lb.lock().await;
+                    lb.mark_unhealthy(&backend_url);
+
+                    let response = Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .body(Body::from("Service Unavailable"))
+                        .unwrap();
+
+                    Ok(response)
+                }
+            }
+        }
+        None => {
+            error!("No healthy backends available");
+
+            let response = Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(Body::from("No healthy backends available"))
+                .unwrap();
+
+            Ok(response)
+        }
+    }
 }
 
 #[tokio::main]
