@@ -199,6 +199,27 @@ async fn health_check(lb: Arc<Mutex<LoadBalancer>>, client: Client<HttpConnector
             let lb = lb.lock().await;
             lb.get_next_backends()
         };
+
+        for backend in backends {
+            info!("Performing health check on {}", backend);
+
+            let url = format!("{}/health", backend);
+            let req = Request::builder()
+                .method(Method::GET)
+                .uri(uri)
+                .body(Body::empty())
+                .unwrap();
+
+            match client.request(req).await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        info!("Health check succeeded for {}", backend);
+                        let mut lb = lb.lock().await;
+                        lb.mark_healthy(&backend);
+                    }
+                }
+            }
+        }
     }
 }
 
