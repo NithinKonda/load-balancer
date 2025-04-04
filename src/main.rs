@@ -11,6 +11,7 @@ use hyper::header::{HeaderName, HeaderValue};
 use hyper::http::uri::Scheme;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Client, Method, Request, Response, Server, StatusCode, Uri};
+use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use log::{error, info, warn};
 use reqwest::{Body, Request, Response};
@@ -110,7 +111,7 @@ fn clone_headers(src_req: &Request<Body>, dst_req: &mut Request<Body>) {
 }
 
 async fn forward_request(
-    client: &Client,
+    client: &Client<HttpConnector>,
     backend: &str,
     req: Request<Body>,
 ) -> Result<Response<Body>, hyper::Error> {
