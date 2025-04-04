@@ -1,4 +1,3 @@
-// Step 3: Set Up the HTTP Server and Implement Request Forwarding DONE
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -6,7 +5,6 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use futures::StreamExt;
-use http::response;
 use hyper::body::{Body, HttpBody};
 use hyper::client::{self, HttpConnector};
 use hyper::header::{HeaderName, HeaderValue};
@@ -18,10 +16,22 @@ use log::{error, info, warn};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
+enum LoadBalancingStrategy {
+    RoundRobin,
+    WeightedRoundRobin,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 enum HealthStatus {
     Healthy,
     Unhealthy(u32),
+}
+
+struct Backend {
+    url: String,
+    health_status: HealthStatus,
+    weight: u32,
+    current_weight: i32,
 }
 
 struct LoadBalancer {
