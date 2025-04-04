@@ -113,7 +113,7 @@ fn clone_headers(src_req: &Request<Body>, dst_req: &mut Request<Body>) {
 async fn forward_request(
     client: &Client<HttpConnector>,
     backend: &str,
-    req: Request<Body>,
+    req: hyper::Request<Body>,
 ) -> Result<Response<Body>, hyper::Error> {
     let uri_string = format!(
         "{}{}",
@@ -131,6 +131,13 @@ async fn forward_request(
     clone_headers(&req, &mut new_req);
 
     client.request(new_req).await
+}
+
+async fn handle_request(
+    req: Request<Body>,
+    lb: Arc<Mutex<LoadBalancer>>,
+    client: Client<HttpConnector>,
+) -> Result<Response<Body>, Infallible> {
 }
 
 #[tokio::main]
