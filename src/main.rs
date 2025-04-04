@@ -248,11 +248,38 @@ async fn main() {
         "http://localhost:9003".to_string(),
     ];
 
-    let load_balancer = Arc::new(Mutex::new(LoadBalancer::new(backends)));
+    let load_balancer = Arc::new(Mutex::new(LoadBalancer::new(backends, 3)));
+
+    let client = Client::new();
+
+    let lb_health = load_balancer.clone();
+    let client_health = client.clone();
+
+    tokio::spawn(async move {
+        health_check(lb_health, client_health).await;
+    });
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
 
     info!("Starting load balancer on {}", addr);
 
-    info!("Load Balancer Stopped");
+    let lb_ref = load_balancer.clone();
+    let make_service = make_service_fn(move |_| {
+        let lb_clone = lb_ref.clone();
+        let client_clone = client.clone();
+
+        async move {
+            Ok::<_, Infallible>(service_fn(move |req| {
+                handle_request(req, lb_clone.clone(), client_clone.clone())
+            }))
+        }
+    });
+
+    let server = Server::bind(&addr).serve(make_service);
+
+    if let Err(e) = server.await {
+        error!("Server error: {}", e);
+    }
+
+    info!("Load balancer stopped");
 }
