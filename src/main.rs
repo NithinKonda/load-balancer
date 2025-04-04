@@ -216,7 +216,22 @@ async fn health_check(lb: Arc<Mutex<LoadBalancer>>, client: Client<HttpConnector
                         info!("Health check succeeded for {}", backend);
                         let mut lb = lb.lock().await;
                         lb.mark_healthy(&backend);
+                    } else {
+                        warn!(
+                            "Health check failed for {} with status {}",
+                            backend,
+                            response.status()
+                        );
+
+                        let mut lb = lb.lock().await;
+                        lb.mark_unhealthy(&backend);
                     }
+                }
+
+                Err(e) => {
+                    error!("Health check error {} : {}", backend, e);
+                    let mut lb = lb.lock().await;
+                    lb.mark_unhealthy(&backend);
                 }
             }
         }
