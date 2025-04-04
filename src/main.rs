@@ -1,11 +1,21 @@
-use http::Request;
-use hyper::Body;
-use log::{error, info, warn};
-use reqwest::{Body, Request};
+
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::usize;
+use std::time::Duration;
+
+use bytes::Bytes;
+use futures::StreamExt;
+use hyper::body::{Body, HttpBody};
+use hyper::client::HttpConnector;
+use hyper::header::{HeaderName, HeaderValue};
+use hyper::http::uri::Scheme;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Client, Method, Request, Response, Server, StatusCode, Uri};
+use hyper_util::rt::TokioExecutor;
+use log::{error, info, warn};
 use tokio::sync::Mutex;
+use tokio::time::sleep;
 
 #[derive(Debug, Clone, PartialEq)]
 enum HealthStatus {
@@ -98,6 +108,14 @@ fn clone_headers(src_req: &Request<Body>, dst_req: &mut Request<Body>) {
         }
     }
 }
+
+
+
+async fn forward_request(
+    client : &Client
+)
+
+
 
 #[tokio::main]
 async fn main() {
