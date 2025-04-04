@@ -39,6 +39,7 @@ struct LoadBalancer {
     current_idx: usize,
     health_status: Vec<HealthStatus>,
     max_failures: u32,
+    strategy: LoadBalancingStrategy,
 }
 
 impl LoadBalancer {
