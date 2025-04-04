@@ -1,4 +1,3 @@
-
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -14,6 +13,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Client, Method, Request, Response, Server, StatusCode, Uri};
 use hyper_util::rt::TokioExecutor;
 use log::{error, info, warn};
+use reqwest::{Body, Request, Response};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -109,13 +109,28 @@ fn clone_headers(src_req: &Request<Body>, dst_req: &mut Request<Body>) {
     }
 }
 
-
-
 async fn forward_request(
-    client : &Client
-)
+    client: &Client,
+    backend: &str,
+    req: Request<Body>,
+) -> Result<Response<Body>, hyper::Error> {
+    let uri_string = format!(
+        "{}{}",
+        backend,
+        req.uri().path_and_query().map_or("", |p| p.as_str())
+    );
+    let uri: Uri = uri_string.parse().unwrap();
 
+    let mut new_req = Request::builder()
+        .method(req.method())
+        .uri(uri)
+        .body(req.into_body())
+        .unwrap();
 
+    clone_headers(&req, &mut new_req);
+
+    client.request(new_req).await
+}
 
 #[tokio::main]
 async fn main() {
