@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::StreamExt;
 use http::response;
 use hyper::body::{Body, HttpBody};
-use hyper::client::HttpConnector;
+use hyper::client::{self, HttpConnector};
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::http::uri::Scheme;
 use hyper::service::{make_service_fn, service_fn};
@@ -41,7 +41,7 @@ impl LoadBalancer {
         }
     }
 
-    fn get_next_backend(&mut self) -> Option<String> {
+    fn get_next_backends(&mut self) -> Option<String> {
         if self.backends.is_empty() {
             return None;
         }
@@ -141,7 +141,7 @@ async fn handle_request(
 
     let backend = {
         let mut lb = lb.lock().await;
-        lb.get_next_backend()
+        lb.get_next_backends()
     };
 
     match backend {
@@ -186,6 +186,19 @@ async fn handle_request(
 
             Ok(response)
         }
+    }
+}
+
+async fn health_check(lb: Arc<Mutex<LoadBalancer>>, client: Client<HttpConnector>) {
+    let interval = Duration::from_secs(10);
+
+    loop {
+        sleep(interval).await;
+
+        let backends = {
+            let lb = lb.lock().await;
+            lb.get_next_backends()
+        };
     }
 }
 
