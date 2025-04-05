@@ -82,6 +82,10 @@ impl LoadBalancer {
         }
     }
 
+    fn set_strategy(&mut self, strategy: LoadBalancingStrategy) {
+        self.strategy = strategy;
+    }
+
     fn get_next_backends(&mut self) -> Option<String> {
         if self.backends.is_empty() {
             return None;
