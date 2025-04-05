@@ -188,7 +188,7 @@ impl LoadBalancer {
         }
     }
 
-    fn all_backends(&self) -> Vec<String> {
+    fn get_all_backends(&self) -> Vec<String> {
         self.backends.iter().map(|b| b.url.clone()).collect()
     }
 }
@@ -328,19 +328,18 @@ async fn handle_request(
 
 async fn health_check(lb: Arc<Mutex<LoadBalancer>>, client: Client<HttpConnector>) {
     let interval = Duration::from_secs(10);
-
     loop {
         sleep(interval).await;
 
         let backends = {
             let lb = lb.lock().await;
-            lb.get_next_backends()
+            lb.get_all_backends()
         };
 
         for backend in backends {
             info!("Performing health check on {}", backend);
 
-            let url = format!("{}/health", backend);
+            let uri = format!("{}/health", backend);
             let req = Request::builder()
                 .method(Method::GET)
                 .uri(uri)
@@ -359,14 +358,12 @@ async fn health_check(lb: Arc<Mutex<LoadBalancer>>, client: Client<HttpConnector
                             backend,
                             response.status()
                         );
-
                         let mut lb = lb.lock().await;
                         lb.mark_unhealthy(&backend);
                     }
                 }
-
                 Err(e) => {
-                    error!("Health check error {} : {}", backend, e);
+                    error!("Health check error for {}: {}", backend, e);
                     let mut lb = lb.lock().await;
                     lb.mark_unhealthy(&backend);
                 }
