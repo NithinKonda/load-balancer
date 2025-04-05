@@ -376,13 +376,16 @@ async fn health_check(lb: Arc<Mutex<LoadBalancer>>, client: Client<HttpConnector
 async fn main() {
     env_logger::init();
 
-    let backends = vec![
-        "http://localhost:9001".to_string(),
-        "http://localhost:9002".to_string(),
-        "http://localhost:9003".to_string(),
+    let backends_with_weights = vec![
+        ("http://localhost:9001".to_string(), 5), // Higher weight (more traffic)
+        ("http://localhost:9002".to_string(), 3), // Medium weight
+        ("http://localhost:9003".to_string(), 2), // Lower weight (less traffic)
     ];
 
-    let load_balancer = Arc::new(Mutex::new(LoadBalancer::new(backends, 3)));
+    let load_balancer = Arc::new(Mutex::new(LoadBalancer::new_weighted(
+        backends_with_weights,
+        3,
+    )));
 
     let client = Client::new();
 
