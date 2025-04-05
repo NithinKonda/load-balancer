@@ -157,39 +157,16 @@ impl LoadBalancer {
         }
     }
 
-    fn get_next_backends(&mut self) -> Option<String> {
-        if self.backends.is_empty() {
-            return None;
-        }
-
-        let start_idx = self.current_idx;
-        loop {
-            if let HealthStatus::Healthy = self.health_status[self.current_idx] {
-                let backend = self.backends[self.current_idx].clone();
-                self.current_idx = (self.current_idx + 1) % self.backends.len();
-
-                return Some(backend);
-            }
-
-            self.current_idx = (self.current_idx + 1) % self.backends.len();
-
-            if self.current_idx == start_idx {
-                return None;
-            }
-        }
-    }
-
     fn mark_unhealthy(&mut self, backend_url: &str) {
-        if let Some(idx) = self.backends.iter().position(|url| url == backend_url) {
-            match &self.health_status[idx] {
+        if let Some(backend) = self.backends.iter_mut().find(|b| b.url == backend_url) {
+            match &backend.health_status {
                 HealthStatus::Healthy => {
-                    self.health_status[idx] = HealthStatus::Unhealthy(1);
-                    warn!("Backend {} marked as Unhealthy (1 failure)", backend_url);
+                    backend.health_status = HealthStatus::Unhealthy(1);
+                    warn!("Backend {} marked as unhealthy (1 failure)", backend_url);
                 }
-
                 HealthStatus::Unhealthy(failures) => {
                     let new_failures = failures + 1;
-                    self.health_status[idx] = HealthStatus::Unhealthy(new_failures);
+                    backend.health_status = HealthStatus::Unhealthy(new_failures);
                     warn!(
                         "Backend {} remains unhealthy ({} failures)",
                         backend_url, new_failures
