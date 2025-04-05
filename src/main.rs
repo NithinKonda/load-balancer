@@ -35,21 +35,30 @@ struct Backend {
 }
 
 struct LoadBalancer {
-    backends: Vec<String>,
+    backends: Vec<Backend>,
     current_idx: usize,
-    health_status: Vec<HealthStatus>,
     max_failures: u32,
     strategy: LoadBalancingStrategy,
 }
 
 impl LoadBalancer {
-    fn new(backends: Vec<String>, max_failures: u32) -> Self {
-        let health_status = vec![HealthStatus::Healthy; backends.len()];
+    fn new(backend_urls: Vec<String>, max_failures: u32) -> Self {
+        let mut backends = Vec::new();
+
+        for url in backend_urls {
+            backends.push(Backend {
+                url,
+                health_status: HealthStatus::Healthy,
+                weight: 1,
+                current_weight: 0,
+            });
+        }
+
         LoadBalancer {
             backends,
             current_idx: 0,
-            health_status,
             max_failures,
+            strategy: LoadBalancingStrategy::RoundRobin,
         }
     }
 
