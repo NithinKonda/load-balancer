@@ -231,9 +231,54 @@ async fn handle_request(
 ) -> Result<Response<Body>, Infallible> {
     info!("Received request: {} {}", req.method(), req.uri());
 
+    if req.uri().path() == "/admin/strategy" {
+        let query = req.uri().query().unwrap_or("");
+        if query.contains("type=weighted") {
+            let mut lb = lb.lock().await;
+            lb.set_strategy(LoadBalancingStrategy::WeightedRoundRobin);
+            info!("Changed load balancing strategy to Weighted Round Robin");
+            return Ok(Response::new(Body::from(
+                "Strategy changed to Weighted Round Robin",
+            )));
+        } else if query.contains("type=roundrobin") {
+            let mut lb = lb.lock().await;
+            lb.set_strategy(LoadBalancingStrategy::RoundRobin);
+            info!("Changed load balancing strategy to Round Robin");
+            return Ok(Response::new(Body::from("Strategy changed to Round Robin")));
+        }
+    }
+
+    if req.uri().path() == "/admin/weight" {
+        if let Some(query) = req.uri().query() {
+            let params: Vec<&str> = query.split('&').collect();
+            let mut backend = None;
+            let mut weight = None;
+
+            for param in params {
+                let kv: Vec<&str> = param.split('=').collect();
+                if kv.len() == 2 {
+                    match kv[0] {
+                        "backend" => backend = Some(kv[1]),
+                        "weight" => weight = kv[1].parse::<u32>().ok(),
+                        _ => {}
+                    }
+                }
+            }
+
+            if let (Some(backend), Some(weight)) = (backend, weight) {
+                let mut lb = lb.lock().await;
+                lb.set_weight(&format!("http://{}", backend), weight);
+                return Ok(Response::new(Body::from(format!(
+                    "Weight for {} set to {}",
+                    backend, weight
+                ))));
+            }
+        }
+    }
+
     let backend = {
         let mut lb = lb.lock().await;
-        lb.get_next_backends()
+        lb.get_next_backend()
     };
 
     match backend {
