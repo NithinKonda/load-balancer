@@ -204,7 +204,7 @@ fn clone_headers(src_req: &Request<Body>, dst_req: &mut Request<Body>) {
 async fn forward_request(
     client: &Client<HttpConnector>,
     backend: &str,
-    req: hyper::Request<Body>,
+    req: Request<Body>,
 ) -> Result<Response<Body>, hyper::Error> {
     let uri_string = format!(
         "{}{}",
