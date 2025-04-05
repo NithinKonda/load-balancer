@@ -177,12 +177,11 @@ impl LoadBalancer {
     }
 
     fn mark_healthy(&mut self, backend_url: &str) {
-        if let Some(idx) = self.backends.iter().position(|url| url == backend_url) {
-            match &self.health_status[idx] {
+        if let Some(backend) = self.backends.iter_mut().find(|b| b.url == backend_url) {
+            match &backend.health_status {
                 HealthStatus::Healthy => {}
-
                 HealthStatus::Unhealthy(_) => {
-                    self.health_status[idx] = HealthStatus::Healthy;
+                    backend.health_status = HealthStatus::Healthy;
                     info!("Backend {} marked as healthy", backend_url);
                 }
             }
@@ -190,7 +189,7 @@ impl LoadBalancer {
     }
 
     fn all_backends(&self) -> Vec<String> {
-        self.backends.clone()
+        self.backends.iter().map(|b| b.url.clone()).collect()
     }
 }
 
