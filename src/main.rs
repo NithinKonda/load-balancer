@@ -116,6 +116,40 @@ impl LoadBalancer {
         }
     }
 
+    fn get_next_backend_weighted(&mut self) -> Option<String> {
+        let has_healthy = self
+            .backends
+            .iter()
+            .any(|b| matches!(b.health_status, HealthStatus::Healthy));
+        if !has_healthy {
+            return None;
+        }
+
+        let mut total = 0;
+        let mut best_idx = 0;
+        let mut best_weight = -1;
+
+        for (i, backend) in self.backends.iter_mut().enumerate() {
+            if matches!(backend.health_status, HealthStatus::Healthy) {
+                total += backend.weight as i32;
+                backend.current_weight += backend.weight as i32;
+
+                if backend.current_weight > best_weight {
+                    best_weight = backend.current_weight;
+                    best_idx = i;
+                }
+            }
+        }
+
+        if best_weight < 0 {
+            return None;
+        }
+
+        self.backends[best_idx].current_weight -= total;
+
+        Some(self.backends[best_idx].url.clone())
+    }
+
     fn get_next_backends(&mut self) -> Option<String> {
         if self.backends.is_empty() {
             return None;
