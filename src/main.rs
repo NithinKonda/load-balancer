@@ -2,6 +2,7 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use std::u32;
 
 use bytes::Bytes;
 use futures::StreamExt;
@@ -59,6 +60,25 @@ impl LoadBalancer {
             current_idx: 0,
             max_failures,
             strategy: LoadBalancingStrategy::RoundRobin,
+        }
+    }
+
+    fn new_weighted(backend_with_weights: Vec<(String, u32)>, max_failures: u32) -> Self {
+        let mut backends = Vec::new();
+
+        for (url, weight) in backend_with_weights {
+            backends.push(Backend {
+                url,
+                health_status: HealthStatus::Healthy,
+                weight,
+                current_weight: 0,
+            });
+        }
+        LoadBalancer {
+            backends,
+            current_idx: 0,
+            max_failures,
+            strategy: LoadBalancingStrategy::WeightedRoundRobin,
         }
     }
 
