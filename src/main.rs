@@ -95,6 +95,8 @@ impl LoadBalancer {
         }
     }
 
+    fn get_next_backend_round_robin(&mut self) -> Option<String> {}
+
     fn get_next_backends(&mut self) -> Option<String> {
         if self.backends.is_empty() {
             return None;
