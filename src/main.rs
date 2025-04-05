@@ -150,6 +150,13 @@ impl LoadBalancer {
         Some(self.backends[best_idx].url.clone())
     }
 
+    fn get_next_backend(&mut self) -> Option<String> {
+        match self.strategy {
+            LoadBalancingStrategy::RoundRobin => self.get_next_backend_round_robin(),
+            LoadBalancingStrategy::WeightedRoundRobin => self.get_next_backend_weighted(),
+        }
+    }
+
     fn get_next_backends(&mut self) -> Option<String> {
         if self.backends.is_empty() {
             return None;
