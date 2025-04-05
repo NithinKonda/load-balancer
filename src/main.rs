@@ -95,7 +95,26 @@ impl LoadBalancer {
         }
     }
 
-    fn get_next_backend_round_robin(&mut self) -> Option<String> {}
+    fn get_next_backend_round_robin(&mut self) -> Option<String> {
+        if self.backends.is_empty() {
+            return None;
+        }
+
+        let start_idx = self.current_idx;
+        loop {
+            if let HealthStatus::Healthy = self.backends[self.current_idx].health_status {
+                let backend = self.backends[self.current_idx].url.clone();
+                self.current_idx = (self.current_idx + 1) % self.backends.len();
+                return Some(backend);
+            }
+
+            self.current_idx = (self.current_idx + 1) % self.backends.len();
+
+            if self.current_idx == start_idx {
+                return None;
+            }
+        }
+    }
 
     fn get_next_backends(&mut self) -> Option<String> {
         if self.backends.is_empty() {
