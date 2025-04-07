@@ -69,6 +69,8 @@ impl LoadBalancer {
             current_idx: 0,
             max_failures,
             strategy: LoadBalancingStrategy::RoundRobin,
+            sessions: HashMap::new(),
+            session_timeout: 300,
         }
     }
 
@@ -88,6 +90,8 @@ impl LoadBalancer {
             current_idx: 0,
             max_failures,
             strategy: LoadBalancingStrategy::WeightedRoundRobin,
+            sessions: HashMap::new(),
+            session_timeout: 300,
         }
     }
 
@@ -102,6 +106,11 @@ impl LoadBalancer {
         } else {
             warn!("Backend {} not found when setting weight", backend_url);
         }
+    }
+
+    fn set_session_timeout(&mut self, timeout: u64) {
+        self.session_timeout = timeout;
+        info!("Set session timeout to {} seconds", timeout);
     }
 
     fn get_next_backend_round_robin(&mut self) -> Option<String> {
