@@ -113,6 +113,18 @@ impl LoadBalancer {
         info!("Set session timeout to {} seconds", timeout);
     }
 
+    fn clean_expired_session(&mut self) {
+        let now = Instant::now();
+
+        self.sessions = self
+            .sessions
+            .drain()
+            .filter(|(_, session)| {
+                now.duration_since(session.last_seen).as_secs() < self.session_timeout
+            })
+            .collect();
+    }
+
     fn get_next_backend_round_robin(&mut self) -> Option<String> {
         if self.backends.is_empty() {
             return None;
