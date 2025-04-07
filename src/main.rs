@@ -212,10 +212,17 @@ impl LoadBalancer {
         backend_url
     }
 
-    fn get_next_backend(&mut self) -> Option<String> {
+    fn get_next_backend(&mut self, client_ip: Option<&str>) -> Option<String> {
         match self.strategy {
             LoadBalancingStrategy::RoundRobin => self.get_next_backend_round_robin(),
             LoadBalancingStrategy::WeightedRoundRobin => self.get_next_backend_weighted(),
+            LoadBalancingStrategy::StickySession => {
+                if let Some(ip) = client_ip {
+                    self.get_backend_for_client(ip)
+                } else {
+                    self.get_next_backend_weighted()
+                }
+            }
         }
     }
 
