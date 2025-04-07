@@ -313,11 +313,22 @@ async fn handle_request(
     req: Request<Body>,
     lb: Arc<Mutex<LoadBalancer>>,
     client: Client<HttpConnector>,
+    remote_addr: SocketAddr,
 ) -> Result<Response<Body>, Infallible> {
-    info!("Received request: {} {}", req.method(), req.uri());
+    info!(
+        "Received request: {} {} from {}",
+        req.method(),
+        req.uri(),
+        remote_addr
+    );
 
-    if req.uri().path() == "/admin/strategy" {
-        let query = req.uri().query().unwrap_or("");
+    let mut req_with_addr = req;
+    req_with_addr.extensions_mut().insert(remote_addr);
+
+    let client_ip = extract_client_ip(&req_with_addr);
+
+    if req_with_addr.uri().path() == "/admin/strategy" {
+        let query = req_with_addr.uri().query().unwrap_or("");
         if query.contains("type=weighted") {
             let mut lb = lb.lock().await;
             lb.set_strategy(LoadBalancingStrategy::WeightedRoundRobin);
@@ -330,11 +341,18 @@ async fn handle_request(
             lb.set_strategy(LoadBalancingStrategy::RoundRobin);
             info!("Changed load balancing strategy to Round Robin");
             return Ok(Response::new(Body::from("Strategy changed to Round Robin")));
+        } else if query.contains("type=sticky") {
+            let mut lb = lb.lock().await;
+            lb.set_strategy(LoadBalancingStrategy::StickySession);
+            info!("Changed load balancing strategy to Sticky Session");
+            return Ok(Response::new(Body::from(
+                "Strategy changed to Sticky Session",
+            )));
         }
     }
 
-    if req.uri().path() == "/admin/weight" {
-        if let Some(query) = req.uri().query() {
+    if req_with_addr.uri().path() == "/admin/weight" {
+        if let Some(query) = req_with_addr.uri().query() {
             let params: Vec<&str> = query.split('&').collect();
             let mut backend = None;
             let mut weight = None;
@@ -361,22 +379,52 @@ async fn handle_request(
         }
     }
 
+    if req_with_addr.uri().path() == "/admin/session-timeout" {
+        if let Some(query) = req_with_addr.uri().query() {
+            let params: Vec<&str> = query.split('&').collect();
+            for param in params {
+                let kv: Vec<&str> = param.split('=').collect();
+                if kv.len() == 2 && kv[0] == "seconds" {
+                    if let Ok(timeout) = kv[1].parse::<u64>() {
+                        let mut lb = lb.lock().await;
+                        lb.set_session_timeout(timeout);
+                        return Ok(Response::new(Body::from(format!(
+                            "Session timeout set to {} seconds",
+                            timeout
+                        ))));
+                    }
+                }
+            }
+        }
+    }
+
     let backend = {
         let mut lb = lb.lock().await;
-        lb.get_next_backend()
+        lb.get_next_backend(client_ip.as_deref())
     };
 
     match backend {
         Some(backend_url) => {
             info!("Forwarding request to backend: {}", backend_url);
 
-            match forward_request(&client, &backend_url, req).await {
-                Ok(response) => {
+            match forward_request(&client, &backend_url, req_with_addr).await {
+                Ok(mut response) => {
                     info!(
                         "Received response from backend {} with status {}",
                         backend_url,
                         response.status()
                     );
+
+                    if {
+                        let lb = lb.lock().await;
+                        matches!(lb.strategy, LoadBalancingStrategy::StickySession)
+                    } {
+                        let cookie_value = format!("backend={}; Path=/", backend_url);
+                        response.headers_mut().insert(
+                            hyper::header::SET_COOKIE,
+                            HeaderValue::from_str(&cookie_value).unwrap(),
+                        );
+                    }
 
                     let mut lb = lb.lock().await;
                     lb.mark_healthy(&backend_url);
@@ -413,6 +461,7 @@ async fn handle_request(
 
 async fn health_check(lb: Arc<Mutex<LoadBalancer>>, client: Client<HttpConnector>) {
     let interval = Duration::from_secs(10);
+
     loop {
         sleep(interval).await;
 
@@ -462,15 +511,21 @@ async fn main() {
     env_logger::init();
 
     let backends_with_weights = vec![
-        ("http://localhost:9001".to_string(), 5), // Higher weight (more traffic)
-        ("http://localhost:9002".to_string(), 3), // Medium weight
-        ("http://localhost:9003".to_string(), 2), // Lower weight (less traffic)
+        ("http://localhost:9001".to_string(), 5),
+        ("http://localhost:9002".to_string(), 3),
+        ("http://localhost:9003".to_string(), 2),
     ];
 
     let load_balancer = Arc::new(Mutex::new(LoadBalancer::new_weighted(
         backends_with_weights,
         3,
     )));
+
+    {
+        let mut lb = load_balancer.lock().await;
+        lb.set_strategy(LoadBalancingStrategy::StickySession);
+        info!("Initial load balancing strategy set to Sticky Session");
+    }
 
     let client = Client::new();
 
@@ -480,19 +535,19 @@ async fn main() {
     tokio::spawn(async move {
         health_check(lb_health, client_health).await;
     });
-
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
 
     info!("Starting load balancer on {}", addr);
 
     let lb_ref = load_balancer.clone();
-    let make_service = make_service_fn(move |_| {
+    let make_service = make_service_fn(move |conn| {
         let lb_clone = lb_ref.clone();
         let client_clone = client.clone();
+        let remote_addr = conn.remote_addr();
 
         async move {
             Ok::<_, Infallible>(service_fn(move |req| {
-                handle_request(req, lb_clone.clone(), client_clone.clone())
+                handle_request(req, lb_clone.clone(), client_clone.clone(), remote_addr)
             }))
         }
     });
