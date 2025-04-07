@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::u32;
 
 use bytes::Bytes;
@@ -20,6 +21,7 @@ use tokio::time::sleep;
 enum LoadBalancingStrategy {
     RoundRobin,
     WeightedRoundRobin,
+    StickySession,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -35,11 +37,18 @@ struct Backend {
     current_weight: i32,
 }
 
+struct SessionInfo {
+    backend_url: String,
+    last_seen: Instant,
+}
+
 struct LoadBalancer {
     backends: Vec<Backend>,
     current_idx: usize,
     max_failures: u32,
     strategy: LoadBalancingStrategy,
+    sessions: HashMap<String, SessionInfo>,
+    session_timeout: u64,
 }
 
 impl LoadBalancer {
