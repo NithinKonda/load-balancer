@@ -92,4 +92,17 @@ impl LoadBalancer {
             config,
         }
     }
+
+    pub fn set_strategy(&mut self, strategy: Strategy) {
+        self.strategy = strategy;
+    }
+
+    pub fn set_weight(&mut self, backend_url: &str, weight: u32) {
+        if let Some(backend) = self.backends.iter_mut().find(|b| b.url == backend_url) {
+            backend.weight = weight;
+            info!("Set weight {} for backend {}", weight, backend_url);
+        } else {
+            warn!("Backend {} not found when setting weight", backend_url);
+        }
+    }
 }
