@@ -221,4 +221,23 @@ impl LoadBalancer {
             }
         }
     }
+
+    pub fn mark_unhealthy(&mut self, backend_url: &str) {
+        if let Some(backend) = self.backends.iter_mut().find(|b| b.url == backend_url) {
+            match &backend.health_status {
+                HealthStatus::Healthy => {
+                    backend.health_status = HealthStatus::Unhealthy(1);
+                    warn!("Backend {} marked as unhealthy (1 failure)", backend_url);
+                }
+                HealthStatus::Unhealthy(failures) => {
+                    let new_failures = failures + 1;
+                    backend.health_status = HealthStatus::Unhealthy(new_failures);
+                    warn!(
+                        "Backend {} remains unhealthy ({} failures)",
+                        backend_url, new_failures
+                    );
+                }
+            }
+        }
+    }
 }
