@@ -35,3 +35,49 @@ async fn handle_request(
 
     Ok(Response::new(Body::from(response_text)))
 }
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() < 2 {
+        eprintln!("Usage: {} SERVER_ID [DELAY_MS]", args[0]);
+        eprintln!("  SERVER_ID: The ID of this server (1, 2, 3, etc.)");
+        eprintln!("  DELAY_MS: Optional artificial delay in milliseconds");
+        return Ok(());
+    }
+
+    let server_id = args[1].parse::<u16>().map_err(|_| "Invalid server ID")?;
+
+    let delay = if args.len() > 2 {
+        let delay_ms = args[2].parse::<u64>().map_err(|_| "Invalid delay")?;
+        Some(Duration::from_millis(delay_ms))
+    } else {
+        None
+    };
+
+    let port = 9000 + server_id;
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+
+    println!("Starting backend server {} on {}...", server_id, addr);
+    if let Some(delay_duration) = delay {
+        println!("  With artificial delay: {:?}", delay_duration);
+    }
+
+    let server_id_clone = server_id;
+    let delay_clone = delay;
+    let make_service = make_service_fn(move |_| {
+        let server_id = server_id_clone;
+        let delay = delay_clone;
+
+        async move { Ok::<_, Infallible>(service_fn(move |req| handle_request(req, server_id, delay))) }
+    });
+
+    let server = Server::bind(&addr).serve(make_service);
+
+    if let Err(e) = server.await {
+        eprintln!("Server error: {}", e);
+    }
+
+    Ok(())
+}
