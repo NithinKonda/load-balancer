@@ -174,4 +174,37 @@ impl LoadBalancer {
 
         Some(self.backends[best_idx].url.clone())
     }
+
+    fn get_backend_for_client(&mut self, client_ip: &str) -> Option<String> {
+        self.cleanup_expired_sessions();
+
+        if let Some(session) = self.sessions.get_mut(client_ip) {
+            if let Some(backend) = self.backends.iter().find(|b| b.url == session.backend_url) {
+                if matches!(backend.health_status, HealthStatus::Healthy) {
+                    session.last_seen = Instant::now();
+                    return Some(session.backend_url.clone());
+                }
+            }
+
+            self.sessions.remove(client_ip);
+        }
+
+        let backend_url = match self.strategy {
+            Strategy::StickySession => self.get_next_backend_weighted(),
+            Strategy::WeightedRoundRobin => self.get_next_backend_weighted(),
+            Strategy::RoundRobin => self.get_next_backend_round_robin(),
+        };
+
+        if let Some(url) = backend_url.clone() {
+            self.sessions.insert(
+                client_ip.to_string(),
+                SessionInfo {
+                    backend_url: url,
+                    last_seen: Instant::now(),
+                },
+            );
+        }
+
+        backend_url
+    }
 }
