@@ -37,3 +37,24 @@ pub fn extract_client_ip(req: &Request<Body>) -> Option<String> {
     
     None
 }
+
+
+
+pub async fn forward_request(
+    client: &Client<HttpConnector>,
+    backend: &str,
+    req: Request<Body>,
+) -> Result<Response<Body>, hyper::Error> {
+    let uri_string = format!("{}{}", backend, req.uri().path_and_query().map_or("", |p| p.as_str()));
+    let uri: Uri = uri_string.parse().unwrap();
+    
+    let mut new_req = Request::builder()
+        .method(req.method())
+        .uri(uri)
+        .body(req.into_body())
+        .unwrap();
+    
+    clone_headers(&req, &mut new_req);
+    
+    client.request(new_req).await
+}
