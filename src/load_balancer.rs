@@ -240,4 +240,21 @@ impl LoadBalancer {
             }
         }
     }
+    pub fn mark_healthy(&mut self, backend_url: &str) {
+        if let Some(backend) = self.backends.iter_mut().find(|b| b.url == backend_url) {
+            match &backend.health_status {
+                HealthStatus::Healthy => {
+                    // Already healthy, do nothing
+                }
+                HealthStatus::Unhealthy(_) => {
+                    backend.health_status = HealthStatus::Healthy;
+                    info!("Backend {} marked as healthy", backend_url);
+                }
+            }
+        }
+    }
+
+    pub fn get_all_backends(&self) -> Vec<String> {
+        self.backends.iter().map(|b| b.url.clone()).collect()
+    }
 }
