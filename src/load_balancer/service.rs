@@ -101,4 +101,32 @@ pub async fn handle_request(
             )));
         }
     }
+
+    if req_with_addr.uri().path() == "/admin/weight" {
+        if let Some(query) = req_with_addr.uri().query() {
+            let params: Vec<&str> = query.split('&').collect();
+            let mut backend = None;
+            let mut weight = None;
+
+            for param in params {
+                let kv: Vec<&str> = param.split('=').collect();
+                if kv.len() == 2 {
+                    match kv[0] {
+                        "backend" => backend = Some(kv[1]),
+                        "weight" => weight = kv[1].parse::<u32>().ok(),
+                        _ => {}
+                    }
+                }
+            }
+
+            if let (Some(backend), Some(weight)) = (backend, weight) {
+                let mut lb = lb.lock().await;
+                lb.set_weight(&format!("http://{}", backend), weight);
+                return Ok(Response::new(Body::from(format!(
+                    "Weight for {} set to {}",
+                    backend, weight
+                ))));
+            }
+        }
+    }
 }
