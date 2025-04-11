@@ -1,4 +1,4 @@
-//LOAD BALANCER
+mod load_balancer;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::SocketAddr;
