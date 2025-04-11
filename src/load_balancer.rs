@@ -105,4 +105,19 @@ impl LoadBalancer {
             warn!("Backend {} not found when setting weight", backend_url);
         }
     }
+
+    pub fn set_session_timeout(&mut self, timeout: u64) {
+        self.session_timeout = timeout;
+        info!("Set session timeout to {} seconds", timeout);
+    }
+
+    fn cleanup_expired_sessions(&mut self) {
+        self.sessions = self
+            .sessions
+            .drain()
+            .filter(|(_, session)| {
+                now.duration_since(session.last_seen).as_secs() < self.session_timeout
+            })
+            .collect();
+    }
 }
