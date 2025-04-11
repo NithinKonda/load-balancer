@@ -65,4 +65,31 @@ impl LoadBalancer {
             config,
         }
     }
+
+    pub fn new_weighted(
+        backends_with_weights: Vec<(String, u32)>,
+        max_failures: u32,
+        config: LoadBalancerConfig,
+    ) -> Self {
+        let mut backends = Vec::new();
+
+        for (url, weight) in backends_with_weights {
+            backends.push(Backend {
+                url,
+                health_status: HealthStatus::Healthy,
+                weight,
+                current_weight: 0,
+            });
+        }
+
+        LoadBalancer {
+            backends,
+            current_idx: 0,
+            max_failures,
+            strategy: Strategy::WeightedRoundRobin,
+            sessions: HashMap::new(),
+            session_timeout: config.session.timeout_seconds,
+            config,
+        }
+    }
 }
