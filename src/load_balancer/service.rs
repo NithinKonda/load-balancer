@@ -129,4 +129,82 @@ pub async fn handle_request(
             }
         }
     }
+    if req_with_addr.uri().path() == "/admin/session-timeout" {
+        if let Some(query) = req_with_addr.uri().query() {
+            let params: Vec<&str> = query.split('&').collect();
+            for param in params {
+                let kv: Vec<&str> = param.split('=').collect();
+                if kv.len() == 2 && kv[0] == "seconds" {
+                    if let Ok(timeout) = kv[1].parse::<u64>() {
+                        let mut lb = lb.lock().await;
+                        lb.set_session_timeout(timeout);
+                        return Ok(Response::new(Body::from(format!(
+                            "Session timeout set to {} seconds",
+                            timeout
+                        ))));
+                    }
+                }
+            }
+        }
+    }
+
+    let backend = {
+        let mut lb = lb.lock().await;
+        lb.get_next_backend(client_ip.as_deref())
+    };
+
+    match backend {
+        Some(backend_url) => {
+            info!("Forwarding request to backend: {}", backend_url);
+
+            match forward_request(&client, &backend_url, req_with_addr).await {
+                Ok(mut response) => {
+                    info!(
+                        "Received response from backend {} with status {}",
+                        backend_url,
+                        response.status()
+                    );
+
+                    if {
+                        let lb = lb.lock().await;
+                        matches!(lb.strategy, Strategy::StickySession)
+                    } {
+                        let cookie_value = format!("backend={}; Path=/", backend_url);
+                        response.headers_mut().insert(
+                            hyper::header::SET_COOKIE,
+                            HeaderValue::from_str(&cookie_value).unwrap(),
+                        );
+                    }
+
+                    let mut lb = lb.lock().await;
+                    lb.mark_healthy(&backend_url);
+
+                    Ok(response)
+                }
+                Err(e) => {
+                    error!("Error forwarding request to {}: {}", backend_url, e);
+
+                    let mut lb = lb.lock().await;
+                    lb.mark_unhealthy(&backend_url);
+
+                    let response = Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .body(Body::from("Service Unavailable"))
+                        .unwrap();
+
+                    Ok(response)
+                }
+            }
+        }
+        None => {
+            error!("No healthy backends available");
+
+            let response = Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(Body::from("No healthy backends available"))
+                .unwrap();
+
+            Ok(response)
+        }
+    }
 }
