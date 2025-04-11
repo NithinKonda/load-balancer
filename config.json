@@ -1,0 +1,28 @@
+{
+  "listen_address": "127.0.0.1:8080",
+  "strategy": "weighted",
+  "backends": [
+    {
+      "url": "http://localhost:9001",
+      "weight": 5
+    },
+    {
+      "url": "http://localhost:9002",
+      "weight": 3
+    },
+    {
+      "url": "http://localhost:9003",
+      "weight": 2
+    }
+  ],
+  "health_check": {
+    "path": "/health",
+    "interval_seconds": 10,
+    "timeout_seconds": 5,
+    "max_failures": 3
+  },
+  "session": {
+    "timeout_seconds": 300,
+    "cookie_name": "lb_session"
+  }
+}
