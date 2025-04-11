@@ -19,3 +19,21 @@ pub fn clone_headers(src_req: &Request<Body>, dst_req: &mut Request<Body>) {
         }
     }
 }
+
+
+pub fn extract_client_ip(req: &Request<Body>) -> Option<String> {
+    if let Some(forwarded_for) = req.headers().get("X-Forwarded-For") {
+        if let Ok(forwarded_str) = forwarded_for.to_str() {
+            let ips: Vec<&str> = forwarded_str.split(',').collect();
+            if !ips.is_empty() {
+                return Some(ips[0].trim().to_string());
+            }
+        }
+    }
+    
+    if let Some(addr) = req.extensions().get::<SocketAddr>() {
+        return Some(addr.ip().to_string());
+    }
+    
+    None
+}
