@@ -24,3 +24,13 @@ pub struct SessionInfo {
     pub backend_url: String,
     pub last_seen: Instant,
 }
+
+pub struct LoadBalancer {
+    pub backends: Vec<Backend>,
+    current_idx: usize,
+    max_failure: u32,
+    strategy: Strategy,
+    sessions: HashMap<String, SessionInfo>,
+    session_timeout: u64,
+    config: LoadBalancerConfig,
+}
